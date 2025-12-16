@@ -1,0 +1,32 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# Environment variables
+.env*
+
+# Build artifacts and package metadata
+build/
+dist/
+*.egg-info/
+*.egg
+
+# OS files
+.DS_Store
+
+# Project-specific
+CLAUDE.md
+logging.txt
