@@ -18,9 +18,9 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write   # REQUIRED for PyPI trusted publishing
+      id-token: write   
       contents: read
-      
+
     steps:
       - uses: actions/checkout@v4
 

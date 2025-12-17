@@ -71,8 +71,7 @@ class MCPObserver:
             )
 
         # API endpoints configuration (must be set before authentication)
-        self.trace_api_url = os.getenv("TRACE_API_URL", "http://127.0.0.1:8000")
-        self.tracking_policy_url = os.getenv("TRACKING_POLICY_URL", "http://127.0.0.1:8000")
+        self.api_url = os.getenv("API_URL", "http://127.0.0.1:8000")
 
         # API Key for authentication
         if api_key:
@@ -188,7 +187,7 @@ class MCPObserver:
         """
         try:
             # Use the base API URL to construct the verify endpoint
-            verify_url = f"{self.trace_api_url}/verify"
+            verify_url = f"{self.api_url}/verify"
 
             with httpx.Client(timeout=5.0) as client:
                 response = client.get(
@@ -251,7 +250,7 @@ class MCPObserver:
                 "full_tracking_allowed": str(full_tracking_allowed).lower()
             }
 
-            url = f"{self.tracking_policy_url}/tracking-policy/{tool_name}"
+            url = f"{self.api_url}/tracking-policy/{tool_name}"
 
             with httpx.Client(timeout=3.0) as client:
                 response = client.get(
@@ -329,7 +328,7 @@ class MCPObserver:
             # Send trace data to API endpoint asynchronously
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.post(
-                    self.trace_api_url + "/trace",
+                    self.api_url + "/trace",
                     json=trace_payload,
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
