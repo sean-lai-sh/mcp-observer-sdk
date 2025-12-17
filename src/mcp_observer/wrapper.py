@@ -144,8 +144,8 @@ def create_async_wrapper(observer, func, sig, has_context: bool, track_io: bool 
                 if span:
                     span.set_attribute("mcp.full_tracking", can_store_full)
             
-            # Record successful call
-            observer.record_call(
+            # Record successful call asynchronously (non-blocking)
+            await observer.record_call(
                 call_id=call_id,
                 tool_name=func_name,
                 input_data=input_data,
@@ -199,8 +199,8 @@ def create_async_wrapper(observer, func, sig, has_context: bool, track_io: bool 
             if track_io:
                 can_store_full = observer._check_tracking_policy(func_name, full_tracking_allowed=True)
             
-            # Record failed call
-            observer.record_call(
+            # Record failed call asynchronously (non-blocking)
+            await observer.record_call(
                 call_id=call_id,
                 tool_name=func_name,
                 input_data=input_data,
@@ -352,8 +352,8 @@ def create_sync_wrapper(observer, func, sig, has_context: bool, track_io: bool =
                 if span:
                     span.set_attribute("mcp.full_tracking", can_store_full)
             
-            # Record successful call
-            observer.record_call(
+            # Record successful call asynchronously (non-blocking)
+            await observer.record_call(
                 call_id=call_id,
                 tool_name=func_name,
                 input_data=input_data,

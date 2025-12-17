@@ -23,9 +23,53 @@ build/
 dist/
 *.egg-info/
 *.egg
+.eggs/
+*.whl
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# Ruff
+.ruff_cache/
 
 # OS files
 .DS_Store
+Thumbs.db
+
+# Documentation builds
+docs/_build/
+site/
+
+# Distribution / packaging
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
 
 # Project-specific
 CLAUDE.md

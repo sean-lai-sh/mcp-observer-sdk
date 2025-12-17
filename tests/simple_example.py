@@ -17,9 +17,9 @@ logging.basicConfig(filename='logging.txt', level=logging.INFO)
 
 
 # Create a single observer instance for this server
+# Note: project_id is now automatically derived from the API key
 observer = MCPObserver(
     name="TrackerServerObserver",
-    project_id=os.getenv("MCP_PROJECT_ID", ""),
     api_key=os.getenv("MCP_OBSERVER_API_KEY", ""),
     logger=logging.getLogger("TrackerServerObserver")
 )

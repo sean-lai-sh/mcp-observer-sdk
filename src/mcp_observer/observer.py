@@ -41,19 +41,18 @@ class MCPObserver:
     """
 
     def __init__(
-        self, 
+        self,
         name: str = "MCPObserver",
         version: str = "1.0.0",
         api_key: str = None,
-        project_id: str = None,
+        project_id: str = None,  # DEPRECATED: Will be derived from API key
         logger: Optional[logging.Logger] = None,
         otlp_endpoint: str = None,
         enable_console_export: bool = False
     ):
         self.name = name
         self.version = version
-        self.project_id = project_id or os.getenv("MCP_PROJECT_ID")
-        
+
         # Instantiate a logger
         if logger is None:
             self.logger = logging.getLogger(self.name + " Logger")
@@ -64,22 +63,39 @@ class MCPObserver:
         else:
             self.logger = logger
 
+        # Warn if project_id is provided (deprecated)
+        if project_id or os.getenv("MCP_PROJECT_ID"):
+            self.logger.warning(
+                "DEPRECATION WARNING: project_id parameter is deprecated and will be ignored. "
+                "The project is now automatically determined from your API key."
+            )
+
         # API endpoints configuration (must be set before authentication)
         self.trace_api_url = os.getenv("TRACE_API_URL", "http://127.0.0.1:8000")
         self.tracking_policy_url = os.getenv("TRACKING_POLICY_URL", "http://127.0.0.1:8000")
-        
+
         # API Key for authentication
         if api_key:
             self.api_key = api_key
         else:
             self.api_key = os.getenv("MCP_OBSERVER_API_KEY", None)
-        
-        if not self.api_key or not self._authenticate_api_key():
+
+        # Authenticate API key and get project_id
+        if not self.api_key:
+            raise ValueError("Missing MCP Observer API key.")
+
+        auth_result = self._authenticate_api_key()
+        if not auth_result:
             raise ValueError("Invalid or missing MCP Observer API key.")
-        
+
+        # project_id is now derived from API key
+        self.project_id = auth_result.get("project_id")
+        if not self.project_id:
+            raise ValueError("Failed to retrieve project_id from API key.")
+
         # Cache for tracking policy to avoid repeated API calls
         self._policy_cache = {}  # tool_name -> (can_store_full, expires_at)
-        
+
         # Initialize OpenTelemetry
         self._init_opentelemetry(otlp_endpoint, enable_console_export)
 
@@ -163,40 +179,46 @@ class MCPObserver:
             self.error_counter = None
     
 
-    def _authenticate_api_key(self) -> bool:
-        """Authenticate API key via API endpoint."""
+    def _authenticate_api_key(self) -> Optional[Dict[str, Any]]:
+        """
+        Authenticate API key via API endpoint.
+
+        Returns:
+            Dict with 'valid', 'api_key_id', and 'project_id' if successful, None otherwise.
+        """
         try:
             # Use the base API URL to construct the verify endpoint
             verify_url = f"{self.trace_api_url}/verify"
-            
+
             with httpx.Client(timeout=5.0) as client:
                 response = client.get(
                     verify_url,
                     headers={"Authorization": f"Bearer {self.api_key}"}
                 )
-                
+
                 if response.status_code == 200:
+                    data = response.json()
                     self.logger.info("API key authentication successful")
-                    return True
+                    return data
                 elif response.status_code == 401:
                     self.logger.error("API key authentication failed: Unauthorized (401)")
-                    return False
+                    return None
                 elif response.status_code == 403:
                     self.logger.error("API key authentication failed: Forbidden (403)")
-                    return False
+                    return None
                 else:
                     self.logger.error(f"API key authentication failed: Unexpected status ({response.status_code})")
-                    return False
+                    return None
 
         except httpx.TimeoutException:
             self.logger.error("API key authentication timeout - server not reachable")
-            return False
+            return None
         except httpx.RequestError as e:
             self.logger.error(f"API key authentication request error: {e}")
-            return False
+            return None
         except Exception as e:
             self.logger.error(f"API key authentication error: {e}")
-            return False
+            return None
 
     def _check_tracking_policy(
         self, 
@@ -222,16 +244,15 @@ class MCPObserver:
                 return can_store
         
         try:
-            # Build URL with query params
+            # Build URL with query params (project_id now derived from API key on backend)
             params = {
-                "project_id": self.project_id,
                 "server_name": self.name,
                 "server_version": self.version,
                 "full_tracking_allowed": str(full_tracking_allowed).lower()
             }
-            
+
             url = f"{self.tracking_policy_url}/tracking-policy/{tool_name}"
-            
+
             with httpx.Client(timeout=3.0) as client:
                 response = client.get(
                     url,
@@ -270,20 +291,19 @@ class MCPObserver:
 
 
 
-    def record_call(self, call_id: str, tool_name: str, input_data: Dict[str, Any], 
+    async def record_call(self, call_id: str, tool_name: str, input_data: Dict[str, Any], 
                    output_data: Any = None, context_data: Dict[str, Any] = None, 
                    started_at: datetime = None, completed_at: datetime = None,
                    error: Optional[Exception] = None, latency_ms: int = None,
                    session_id: str = None, client_name: str = None, model_name: str = None,
                    can_store_full: bool = False, json_in: Dict[str, Any] = None, 
                    json_out: Any = None, full_tracking_allowed: bool = False):
-        """Record a function call by sending trace data to the API endpoint."""
+        """Record a function call by sending trace data to the API endpoint asynchronously."""
         
         try:
-            # Prepare trace payload matching TraceData model
+            # Prepare trace payload (project_id now derived from API key on backend)
             trace_payload = {
                 "call_id": call_id,
-                "project_id": self.project_id,
                 "server_name": self.name,
                 "server_version": self.version,
                 "tool_name": tool_name,
@@ -306,9 +326,9 @@ class MCPObserver:
             # Log the trace payload
             self.logger.debug(f"Sending trace payload: {json.dumps(trace_payload, indent=2, default=str)}")
             
-            # Send trace data to API endpoint
-            with httpx.Client(timeout=10.0) as client:
-                response = client.post(
+            # Send trace data to API endpoint asynchronously
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(
                     self.trace_api_url + "/trace",
                     json=trace_payload,
                     headers={

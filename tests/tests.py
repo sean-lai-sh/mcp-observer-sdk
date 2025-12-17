@@ -1,4 +1,4 @@
-import pytest
+
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
@@ -9,7 +9,6 @@ load_dotenv()
 mcp_observer = MCPObserver(
     name="TestObserver",
     version="1.0.0",
-    project_id=os.getenv("MCP_PROJECT_ID", ""),
     api_key=os.getenv("MCP_OBSERVER_API_KEY", "")
 )
 

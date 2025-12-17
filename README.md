@@ -1,29 +1,43 @@
-# MCP Observer Library
+# MCP Observer SDK
 
-A simple decorator library that handles your loggings and connects to our platform to provide you telemetry and insights. Current works by logging per call to our durable storage solution and having short term session data streamed via opentelemetry using console output. We handle all forms of mcp tool function signatures through our wrapper so all you have to do is add the decorator to your existing mcp tools.
+[![PyPI version](https://badge.fury.io/py/mcp-observer.svg)](https://badge.fury.io/py/mcp-observer)
+[![Python Versions](https://img.shields.io/pypi/pyversions/mcp-observer.svg)](https://pypi.org/project/mcp-observer/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+A lightweight, decorator-based observability SDK for [Model Context Protocol (MCP)](https://modelcontextprotocol.io) tools. Add comprehensive telemetry and insights to your MCP servers with a single line of code.
+
+## Features
+
+- **Zero-friction Integration**: Add observability with a simple decorator
+- **OpenTelemetry Support**: Built-in tracing, metrics, and distributed context propagation
+- **Privacy-First**: Configurable I/O tracking with dual-consent system
+- **Universal Compatibility**: Works with all MCP tool function signatures
+- **Dual Storage**: Durable storage for analytics + real-time streaming via OpenTelemetry
+- **Session Tracking**: Automatic session and request correlation
 
 ## Installation
 
-### Using pip
+### From PyPI
 
 ```bash
-pip install -r requirements.txt
+pip install mcp-observer
 ```
 
 ### Using uv (recommended)
 
 ```bash
-uv pip install -e .
+uv pip install mcp-observer
 ```
 
 ### For development
 
 ```bash
-# Using pip
-pip install -r requirements.txt
+# Clone the repository
+git clone https://github.com/yourusername/mcp-observer-sdk.git
+cd mcp-observer-sdk
 
-# Using uv
-uv pip install -e ".[dev]"
+# Install in development mode
+pip install -e ".[dev]"
 ```
 
 ## Quick Start
@@ -35,11 +49,10 @@ from fastmcp import FastMCP
 # Initialize your MCP server
 mcp = FastMCP("MyServer")
 
-# Initialize the observer
+# Initialize the observer (project is automatically determined from your API key)
 observer = MCPObserver(
     name="MyServer",
     version="1.0.0",
-    project_id="your-project-uuid",
     api_key="your-generated-api-key"
 )
 
@@ -63,7 +76,6 @@ mcp = FastMCP("MathServer")
 observer = MCPObserver(
     name="MathServer",
     version="1.0.0",
-    project_id="your-project-uuid",
     api_key="your-api-key"
 )
 
@@ -85,7 +97,6 @@ mcp = FastMCP("EchoServer")
 observer = MCPObserver(
     name="EchoServer",
     version="1.0.0",
-    project_id="your-project-uuid",
     api_key="your-api-key"
 )
 
@@ -116,8 +127,7 @@ async def process_sensitive_data(user_data: dict) -> dict:
 ### Constructor
 - `name`: Name of your server or application (This is what appears in logging)
 - `version`: Version of your server/application
-- `project_id`: Your project ID
-- `api_key`: Your API key for authentication
+- `api_key`: Your API key for authentication (project is automatically determined from this key)
 
 ### Decorator: `@observer.track()`
 
@@ -134,7 +144,6 @@ The SDK automatically integrates with OpenTelemetry for distributed tracing and 
 observer = MCPObserver(
     name="MyServer",
     version="1.0.0",
-    project_id="your-project-uuid",
     api_key="your-api-key",
     otlp_endpoint="http://localhost:4317",  # Optional: Send to OTLP collector
     enable_console_export=True  # Optional: Enable console debugging
@@ -180,7 +189,6 @@ my_logger.setLevel(logging.DEBUG)
 observer = MCPObserver(
     name="MyServer",
     version="1.0.0",
-    project_id="your-project-uuid",
     api_key="your-api-key",
     logger=my_logger
 )
@@ -195,5 +203,102 @@ uv pip install -e ".[dev]"
 # Run the example server
 python tests/simple_example.py
 ```
+
+## API Reference
+
+### `MCPObserver(name, version, api_key, **kwargs)`
+
+Initialize the observer for your MCP server.
+
+**Parameters:**
+
+- `name` (str): Your server/application name
+- `version` (str): Your server/application version
+- `api_key` (str): Authentication key (project is auto-determined)
+- `otlp_endpoint` (str, optional): OTLP collector endpoint
+- `enable_console_export` (bool, optional): Enable console span/metric output
+- `logger` (logging.Logger, optional): Custom logger instance
+
+### `@observer.track(track_io=False)`
+
+Decorator to add observability to MCP tools.
+
+**Parameters:**
+
+- `track_io` (bool, optional): Enable full I/O tracking (requires project consent). Default: False
+
+**Returns:**
+
+- Decorated async function with telemetry
+
+## Development
+
+### Running Tests
+
+```bash
+# Install development dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest
+
+# Run with coverage
+pytest --cov=mcp_observer --cov-report=html
+```
+
+### Code Quality
+
+```bash
+# Format code
+black src tests
+
+# Type checking
+mypy src
+
+# Linting
+ruff check src tests
+```
+
+## Project Structure
+
+```text
+mcp-observer-sdk/
+├── src/
+│   └── mcp_observer/
+│       ├── __init__.py          # Package exports
+│       ├── observer.py          # Main MCPObserver class
+│       └── wrapper.py           # Decorator and telemetry logic
+├── tests/
+│   └── simple_example.py        # Example MCP server
+├── pyproject.toml               # Package configuration
+├── README.md                    # This file
+└── LICENSE                      # MIT License
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/yourusername/mcp-observer-sdk/issues)
+- **Documentation**: [Full Documentation](https://docs.yourdomain.com)
+- **Email**: <support@yourdomain.com>
+
+## Acknowledgments
+
+- Built for the [Model Context Protocol](https://modelcontextprotocol.io)
+- Powered by [OpenTelemetry](https://opentelemetry.io)
+- Inspired by the need for better MCP tool observability
 
 
