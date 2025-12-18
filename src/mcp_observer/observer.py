@@ -48,7 +48,9 @@ class MCPObserver:
         project_id: str = None,  # DEPRECATED: Will be derived from API key
         logger: Optional[logging.Logger] = None,
         otlp_endpoint: str = None,
-        enable_console_export: bool = False
+        enable_console_export: bool = False,
+        run_aware: bool = True,
+        run_timeout_seconds: float = 30.0
     ):
         self.name = name
         self.version = version
@@ -97,6 +99,18 @@ class MCPObserver:
 
         # Initialize OpenTelemetry
         self._init_opentelemetry(otlp_endpoint, enable_console_export)
+
+        # Initialize RunManager if run_aware mode is enabled
+        if run_aware:
+            from .run_manager import RunManager
+            self.run_manager = RunManager(
+                run_timeout_seconds=run_timeout_seconds,
+                logger=self.logger
+            )
+            self.logger.info(f"RunManager initialized (timeout: {run_timeout_seconds}s)")
+        else:
+            self.run_manager = None
+            self.logger.info("RunManager disabled (run_aware=False)")
 
 
     def _init_opentelemetry(self, otlp_endpoint: Optional[str] = None, enable_console: bool = False):
@@ -290,16 +304,21 @@ class MCPObserver:
 
 
 
-    async def record_call(self, call_id: str, tool_name: str, input_data: Dict[str, Any], 
-                   output_data: Any = None, context_data: Dict[str, Any] = None, 
+    async def record_call(self, call_id: str, tool_name: str, input_data: Dict[str, Any],
+                   output_data: Any = None, context_data: Dict[str, Any] = None,
                    started_at: datetime = None, completed_at: datetime = None,
                    error: Optional[Exception] = None, latency_ms: int = None,
                    session_id: str = None, client_name: str = None, model_name: str = None,
-                   can_store_full: bool = False, json_in: Dict[str, Any] = None, 
-                   json_out: Any = None, full_tracking_allowed: bool = False):
+                   can_store_full: bool = False, json_in: Dict[str, Any] = None,
+                   json_out: Any = None, full_tracking_allowed: bool = False,
+                   run_id: str = None):
         """Record a function call by sending trace data to the API endpoint asynchronously."""
-        
+
         try:
+            # Extract run_id from context_data if not provided directly
+            if run_id is None and context_data:
+                run_id = context_data.get("run_id")
+
             # Prepare trace payload (project_id now derived from API key on backend)
             trace_payload = {
                 "call_id": call_id,
@@ -314,6 +333,7 @@ class MCPObserver:
                 "error": str(error) if error else None,
                 "latency_ms": latency_ms,
                 "session_id": session_id,
+                "run_id": run_id,
                 "client_name": client_name,
                 "model_name": model_name,
                 "can_store_full": can_store_full,

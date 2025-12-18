@@ -14,6 +14,7 @@ A lightweight, decorator-based observability SDK for [Model Context Protocol (MC
 - **Universal Compatibility**: Works with all MCP tool function signatures
 - **Dual Storage**: Durable storage for analytics + real-time streaming via OpenTelemetry
 - **Session Tracking**: Automatic session and request correlation
+- **Run Tracking**: Automatic conversation-level grouping of tool calls with timeout-based lifecycle
 
 ## Installation
 
@@ -44,7 +45,7 @@ pip install -e ".[dev]"
 
 ```python
 from mcp_observer import MCPObserver
-from fastmcp import FastMCP
+from fastmcp import FastMCP, Context
 
 # Initialize your MCP server
 mcp = FastMCP("MyServer")
@@ -56,13 +57,16 @@ observer = MCPObserver(
     api_key="your-generated-api-key"
 )
 
-# Decorate your tools
+# Decorate your tools - IMPORTANT: Include Context parameter for run tracking
 @mcp.tool()
 @observer.track(track_io=True)
-async def my_tool(data: dict) -> dict:
+async def my_tool(data: dict, ctx: Context = None) -> dict:
     # Your tool logic here
+    # The ctx parameter enables automatic session and run tracking
     return {"result": "success"}
 ```
+
+> **💡 Pro Tip**: Always include the `ctx: Context = None` parameter in your tools to enable proper session and run tracking. Without it, each tool call will be tracked as a separate run.
 
 ## Examples
 
@@ -122,12 +126,88 @@ async def process_sensitive_data(user_data: dict) -> dict:
     return {"status": "processed"}
 ```
 
+## Run Tracking
+
+**Runs** provide automatic conversation-level grouping of tool calls within sessions. A run represents a logical task or conversation, and automatically closes after a period of inactivity.
+
+### How It Works
+
+When you include a `Context` parameter in your tools:
+
+1. **First tool call** in a session → Creates a new run
+2. **Subsequent calls** within 30 seconds → Reuse the same run (grouped together)
+3. **After 30s of inactivity** → Previous run closes, next call creates a new run
+4. **No Context** → Each call is its own run (no grouping)
+
+### Configuration
+
+```python
+# Default: Run tracking enabled with 30s timeout
+observer = MCPObserver(
+    name="MyServer",
+    version="1.0.0",
+    api_key="your-api-key"
+)
+
+# Custom timeout (60 seconds)
+observer = MCPObserver(
+    name="MyServer",
+    version="1.0.0",
+    api_key="your-api-key",
+    run_timeout_seconds=60.0
+)
+
+# Disable run tracking (not recommended for agent use cases)
+observer = MCPObserver(
+    name="MyServer",
+    version="1.0.0",
+    api_key="your-api-key",
+    run_aware=False
+)
+```
+
+### Why Use Run Tracking?
+
+Run tracking is essential for understanding agent behavior:
+
+- **Conversation Analysis**: See which tool calls belong to the same conversation
+- **Performance Monitoring**: Track end-to-end latency for multi-step tasks
+- **Debugging**: Trace error propagation across related tool calls
+- **Usage Analytics**: Understand how agents compose tools together
+
+### Best Practices
+
+✅ **DO**: Always include `ctx: Context = None` in your tool signatures
+
+```python
+@mcp.tool()
+@observer.track(track_io=True)
+async def my_tool(query: str, ctx: Context = None) -> str:
+    # Proper run tracking
+    return "result"
+```
+
+❌ **DON'T**: Omit the Context parameter for agent-facing tools
+
+```python
+@mcp.tool()
+@observer.track(track_io=True)
+async def my_tool(query: str) -> str:
+    # No run grouping - each call is isolated
+    return "result"
+```
+
 ## Parameters on MCP Observer:
 
 ### Constructor
 - `name`: Name of your server or application (This is what appears in logging)
 - `version`: Version of your server/application
 - `api_key`: Your API key for authentication (project is automatically determined from this key)
+- `run_aware`: Enable run tracking (default: `True`)
+- `run_timeout_seconds`: Inactivity timeout for closing runs in seconds (default: `30.0`)
+- `otlp_endpoint`: Optional OTLP collector endpoint for distributed tracing
+- `enable_console_export`: Enable console debugging output (default: `False`)
+- `logger`: Custom logger instance (optional)
 
 ### Decorator: `@observer.track()`
 
@@ -215,6 +295,8 @@ Initialize the observer for your MCP server.
 - `name` (str): Your server/application name
 - `version` (str): Your server/application version
 - `api_key` (str): Authentication key (project is auto-determined)
+- `run_aware` (bool, optional): Enable run tracking. Default: `True`
+- `run_timeout_seconds` (float, optional): Inactivity timeout for closing runs. Default: `30.0`
 - `otlp_endpoint` (str, optional): OTLP collector endpoint
 - `enable_console_export` (bool, optional): Enable console span/metric output
 - `logger` (logging.Logger, optional): Custom logger instance

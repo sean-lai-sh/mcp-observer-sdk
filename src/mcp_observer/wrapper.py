@@ -45,11 +45,11 @@ def create_async_wrapper(observer, func, sig, has_context: bool, track_io: bool 
         context = None
         session_id = None
         can_store_full = None
-        
+
         if has_context:
             # Look for context in kwargs first
             context = kwargs.get('ctx') or kwargs.get('context')
-            
+
             # If not in kwargs, try to bind args to find context
             if context is None:
                 try:
@@ -63,7 +63,26 @@ def create_async_wrapper(observer, func, sig, has_context: bool, track_io: bool 
                 session_id = context.session_id
                 if span:
                     span.set_attribute("mcp.session_id", session_id)
-        
+
+        # Resolve or create run_id (immediately after extracting context)
+        run_id = call_id  # Default: synthetic run_id (one run per call)
+        is_new_run = False
+        if observer.run_manager and session_id:
+            try:
+                run_id, is_new_run = await observer.run_manager.resolve_or_create_run(
+                    session_id=session_id,
+                    timestamp=datetime.now()
+                )
+                observer.logger.info(
+                    f"[TRACK] Run ID: {run_id} ({'new' if is_new_run else 'existing'})"
+                )
+                if span:
+                    span.set_attribute("mcp.run_id", run_id)
+                    span.set_attribute("mcp.run_is_new", is_new_run)
+            except Exception as run_error:
+                observer.logger.warning(f"Failed to resolve run: {run_error}, using synthetic run_id")
+                # Fall back to synthetic run_id (call_id)
+
         # Create clean payload for database (exclude Context objects)
         clean_args = []
         for arg in args:
@@ -89,7 +108,8 @@ def create_async_wrapper(observer, func, sig, has_context: bool, track_io: bool 
         context_data = {
             "session_id": session_id,
             "has_context": context is not None,
-            "function_signature": str(sig)
+            "function_signature": str(sig),
+            "run_id": run_id
         }
         
         # Add input info to span
@@ -231,12 +251,12 @@ def create_async_wrapper(observer, func, sig, has_context: bool, track_io: bool 
 
 def create_sync_wrapper(observer, func, sig, has_context: bool, track_io: bool = False):
     """Create a sync wrapper for tracking function calls."""
-    
+
     @functools.wraps(func)
     async def async_wrapper(*args, **kwargs):
         call_id = str(uuid.uuid4())
         func_name = getattr(func, '__name__', 'unknown_function')
-        
+
         # Start OpenTelemetry span
         span = None
         if OTEL_AVAILABLE and observer.tracer:
@@ -249,15 +269,15 @@ def create_sync_wrapper(observer, func, sig, has_context: bool, track_io: bool =
                     "mcp.track_io": track_io,
                 }
             )
-        
+
         # Extract context if present
         context = None
         session_id = None
-        
+
         if has_context:
             # Look for context in kwargs first
             context = kwargs.get('ctx') or kwargs.get('context')
-            
+
             # If not in kwargs, try to bind args to find context
             if context is None:
                 try:
@@ -271,7 +291,26 @@ def create_sync_wrapper(observer, func, sig, has_context: bool, track_io: bool =
                 session_id = context.session_id
                 if span:
                     span.set_attribute("mcp.session_id", session_id)
-        
+
+        # Resolve or create run_id (immediately after extracting context)
+        run_id = call_id  # Default: synthetic run_id (one run per call)
+        is_new_run = False
+        if observer.run_manager and session_id:
+            try:
+                run_id, is_new_run = await observer.run_manager.resolve_or_create_run(
+                    session_id=session_id,
+                    timestamp=datetime.now()
+                )
+                observer.logger.info(
+                    f"[TRACK] Run ID: {run_id} ({'new' if is_new_run else 'existing'})"
+                )
+                if span:
+                    span.set_attribute("mcp.run_id", run_id)
+                    span.set_attribute("mcp.run_is_new", is_new_run)
+            except Exception as run_error:
+                observer.logger.warning(f"Failed to resolve run: {run_error}, using synthetic run_id")
+                # Fall back to synthetic run_id (call_id)
+
         # Create clean payload for database (exclude Context objects)
         clean_args = []
         for arg in args:
@@ -297,7 +336,8 @@ def create_sync_wrapper(observer, func, sig, has_context: bool, track_io: bool =
         context_data = {
             "session_id": session_id,
             "has_context": context is not None,
-            "function_signature": str(sig)
+            "function_signature": str(sig),
+            "run_id": run_id
         }
         
         # Add input info to span
