@@ -7,7 +7,7 @@ import functools
 import json
 import uuid
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from fastmcp import Context
 import inspect
 
@@ -71,7 +71,7 @@ def create_async_wrapper(observer, func, sig, has_context: bool, track_io: bool 
             try:
                 run_id, is_new_run = await observer.run_manager.resolve_or_create_run(
                     session_id=session_id,
-                    timestamp=datetime.now()
+                    timestamp=datetime.now(timezone.utc)
                 )
                 observer.logger.info(
                     f"[TRACK] Run ID: {run_id} ({'new' if is_new_run else 'existing'})"
@@ -129,10 +129,10 @@ def create_async_wrapper(observer, func, sig, has_context: bool, track_io: bool 
         
         try:
             # Call the original function with original arguments
-            start_time = datetime.now()
+            start_time = datetime.now(timezone.utc)
             start_perf = time.perf_counter()
             result = await func(*args, **kwargs)
-            end_time = datetime.now()
+            end_time = datetime.now(timezone.utc)
             end_perf = time.perf_counter()
             latency_ms = int((end_perf - start_perf) * 1000)
 
@@ -189,7 +189,7 @@ def create_async_wrapper(observer, func, sig, has_context: bool, track_io: bool 
             
         except Exception as e:
             error = e
-            end_time = datetime.now()
+            end_time = datetime.now(timezone.utc)
             end_perf = time.perf_counter()
             latency_ms = int((end_perf - start_perf) * 1000)
 
@@ -299,7 +299,7 @@ def create_sync_wrapper(observer, func, sig, has_context: bool, track_io: bool =
             try:
                 run_id, is_new_run = await observer.run_manager.resolve_or_create_run(
                     session_id=session_id,
-                    timestamp=datetime.now()
+                    timestamp=datetime.now(timezone.utc)
                 )
                 observer.logger.info(
                     f"[TRACK] Run ID: {run_id} ({'new' if is_new_run else 'existing'})"
@@ -357,10 +357,10 @@ def create_sync_wrapper(observer, func, sig, has_context: bool, track_io: bool =
         
         try:
             # Call the original function with original arguments
-            start_time = datetime.now()
+            start_time = datetime.now(timezone.utc)
             start_perf = time.perf_counter()
             result = await func(*args, **kwargs)
-            end_time = datetime.now()
+            end_time = datetime.now(timezone.utc)
             end_perf = time.perf_counter()
             latency_ms = int((end_perf - start_perf) * 1000)
 
@@ -417,7 +417,7 @@ def create_sync_wrapper(observer, func, sig, has_context: bool, track_io: bool =
             
         except Exception as e:
             error = e
-            end_time = datetime.now()
+            end_time = datetime.now(timezone.utc)
             end_perf = time.perf_counter()
             latency_ms = int((end_perf - start_perf) * 1000)
 
@@ -483,7 +483,7 @@ def create_async_noauth_wrapper(observer, func, sig):
     @functools.wraps(func)
     async def async_wrapper(*args, **kwargs):
         call_id = str(uuid.uuid4())
-        start_time = datetime.now()
+        start_time = datetime.now(timezone.utc)
         func_name = getattr(func, '__name__', 'unknown_function')
         
         # Create clean payload - no context filtering needed
@@ -556,7 +556,7 @@ def create_sync_noauth_wrapper(observer, func, sig):
     @functools.wraps(func)
     def sync_wrapper(*args, **kwargs):
         call_id = str(uuid.uuid4())
-        start_time = datetime.now()
+        start_time = datetime.now(timezone.utc)
         func_name = getattr(func, '__name__', 'unknown_function')
         
         input_data = {

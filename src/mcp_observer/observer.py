@@ -105,9 +105,11 @@ class MCPObserver:
             from .run_manager import RunManager
             self.run_manager = RunManager(
                 run_timeout_seconds=run_timeout_seconds,
+                sweeper_interval=5.0,  # Check for expired runs every 5 seconds
                 logger=self.logger
             )
-            self.logger.info(f"RunManager initialized (timeout: {run_timeout_seconds}s)")
+            self.run_manager.set_observer(self)  # Set reference for run_end callbacks
+            self.logger.info(f"RunManager initialized (timeout: {run_timeout_seconds}s, sweeper: 5s)")
         else:
             self.run_manager = None
             self.logger.info("RunManager disabled (run_aware=False)")
@@ -390,7 +392,55 @@ class MCPObserver:
             self.logger.error(f"Unexpected error while recording trace for call {call_id}: {e}")
             self.logger.debug(f"Trace payload (failed to send): {json.dumps(trace_payload, indent=2, default=str)}")
             return None
-    
+
+    async def notify_run_end(
+        self,
+        run_id: str,
+        session_id: str,
+        ended_at: datetime,
+        reason: str = "timeout"
+    ):
+        """
+        Notify backend that a run has ended.
+
+        Args:
+            run_id: The run ID that ended
+            session_id: The session ID
+            ended_at: When the run ended (timezone-aware UTC)
+            reason: Why it ended (timeout, explicit, error)
+        """
+        try:
+            payload = {
+                "run_id": run_id,
+                "session_id": session_id,
+                "ended_at": ended_at.isoformat(),
+                "reason": reason
+            }
+
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.post(
+                    f"{self.api_url}/runs/end",
+                    json=payload,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json"
+                    }
+                )
+
+                if response.status_code in [200, 201]:
+                    self.logger.info(
+                        f"Successfully notified backend of run end: {run_id}"
+                    )
+                else:
+                    self.logger.warning(
+                        f"Failed to notify run end (status {response.status_code}): "
+                        f"{response.text}"
+                    )
+
+        except Exception as e:
+            self.logger.error(f"Error notifying run end: {e}")
+            # Don't raise - this is best-effort notification
+
 
     def track(self, func: Callable = None, *, track_io: bool = False) -> Callable:
         """
